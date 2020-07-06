@@ -16,15 +16,15 @@ from rollout import RolloutWorker
 
 DEFAULT_PARAMS = {
     # environment
-    'env_name': 'FetchPush-v1',       # 'FetchReach-v1', 'FetchPush-v1', 'FetchPickAndPlace-v1', 'FetchSlide-v1'
+    'env_name': 'FetchPush-v1',               # 'FetchReach-v1', 'FetchPush-v1', 'FetchPickAndPlace-v1', 'FetchSlide-v1'
     'seed': 0,                                # random seed for environment, torch, numpy, random packages
     'T': 50,                                  # maximum episode length
 
     # training setup
     'replay_strategy': 'future',              # 'none' for vanilla ddpg, 'future' for HER
-    'num_workers': 16,                         # number of parallel workers with mpi
-    'max_timesteps': 8000000,
-    #'n_epochs': 50,                            # number of epochs, HER paper: 200 epochs
+    'num_workers': 16,                        # number of parallel workers with mpi
+    'max_timesteps': 8000000,                 # maximum number of total timesteps, HER paper: 8mil
+    #'n_epochs': 50,                          # number of epochs, HER paper: 200 epochs
     'n_cycles': 10,                           # number of cycles per epoch, HER paper: 50 cycles TODO
     'n_optim': 40,                            # number of optimization steps every cycle
     'n_test_rollouts': 10,                    # number of rollouts for testing, rollouts are episodes from num_workers
@@ -82,8 +82,7 @@ def dims_and_reward_fun(env_name):
 def train(agent, rollout_worker, evaluation_worker):
     """Train DDPG with multiple workers"""
     scores = []
-    #print("maximum number of timesteps:", DEFAULT_PARAMS['n_epochs']*DEFAULT_PARAMS['n_cycles']*DEFAULT_PARAMS['T'])
-    #print("{} worker, per worker {} epochs".format(DEFAULT_PARAMS['num_workers'],
+
 
     n_epochs = int(DEFAULT_PARAMS['max_timesteps'] // DEFAULT_PARAMS['n_cycles'] //
                    DEFAULT_PARAMS['T'] // DEFAULT_PARAMS['num_workers'])
@@ -97,10 +96,10 @@ def train(agent, rollout_worker, evaluation_worker):
 
         for _ in range(DEFAULT_PARAMS['n_cycles']):
             episode = rollout_worker.generate_rollouts()  # generate episodes with every parallel environment
-            agent.store_episode(episode)                 # store experiences as whole episodes
+            agent.store_episode(episode)                  # store experiences as whole episodes
             for _ in range(DEFAULT_PARAMS['n_optim']):    # optimize target network
                 agent.train()
-            agent.update_target_net()                    # update target network
+            agent.update_target_net()                     # update target network
 
         # testing agent for report
         test_scores = []
