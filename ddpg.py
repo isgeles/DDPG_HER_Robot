@@ -2,6 +2,7 @@ import copy
 import numpy as np
 import torch
 import torch.optim as optim
+import torch.nn.functional as F
 
 from model import Actor, Critic
 from collections import OrderedDict
@@ -61,7 +62,7 @@ class ddpgAgent(object):
         self.actor_optimizer = optim.Adam(self.actor_local.parameters(), lr=self.actor_lr)
         self.critic_optimizer = optim.Adam(self.critic_local.parameters(), lr=self.critic_lr)
 
-        # Configure the replay buffer.
+        # Configuring the replay buffer
         buffer_shapes = {key: (self.T-1 if key != 'o' else self.T, self.input_dims[key])
                          for key, val in self.input_dims.items()}
         buffer_shapes['g'] = (buffer_shapes['g'][0], self.dimg)
@@ -120,59 +121,51 @@ class ddpgAgent(object):
         return [transitions[key] for key in self.stage_shapes.keys()]
 
     def train(self):
-        # TODO: delete unneeded steps
+
         batch = self.sample_batch()
         batch_dict = OrderedDict([(key, batch[i].astype(np.float32).copy())
                                  for i, key in enumerate(self.stage_shapes.keys())])
         batch_dict['r'] = np.reshape(batch_dict['r'], [-1, 1])
 
-        local_net_batch = batch_dict
-        target_net_batch = batch_dict.copy()
-        target_net_batch['o'] = batch_dict['o_2']
+        # prepare state, action, reward, next state
+        obs = torch.tensor(self.obs_normalizer.normalize(batch_dict['o'])).to(self.device)
+        goal = torch.tensor(self.goal_normalizer.normalize(batch_dict['g'])).to(self.device)
+        actions = torch.tensor(batch_dict['u']).to(self.device)
+        rewards = torch.tensor(batch_dict['r'].astype(np.float32)).to(self.device)
+        obs_2 = torch.tensor(self.obs_normalizer.normalize(batch_dict['o_2'])).to(self.device)
 
-        # LOCAL NETWORK ----------------------------------------------------
-        obs = self.obs_normalizer.normalize(local_net_batch['o'])
-        goal = self.goal_normalizer.normalize(local_net_batch['g'])
-        obs = torch.tensor(obs).to(self.device)
-        goal = torch.tensor(goal).to(self.device)
-        actions = torch.tensor(local_net_batch['u']).to(self.device)
+        # update critic --------------------------------------------------------------
 
-        policy_output = self.actor_local(torch.cat([obs, goal], dim=1))
-        # temporary
-        self.local_net_pi = policy_output  # action expected
-        self.local_net_q_pi = self.critic_local(torch.cat([obs, goal], dim=1), policy_output)
-        self.local_net_q = self.critic_local(torch.cat([obs, goal], dim=1), actions)
+        # compute predicted Q values
+        next_actions = self.actor_target(torch.cat([obs_2, goal], dim=1))
+        next_Q_targets = self.critic_target(torch.cat([obs_2, goal], dim=1), next_actions)
 
-        # TARGET NETWORK ---------------------------------------------------
-        obs = self.obs_normalizer.normalize(target_net_batch['o'])
-        goal = self.goal_normalizer.normalize(target_net_batch['g'])
-        obs = torch.tensor(obs).to(self.device)
-        goal = torch.tensor(goal).to(self.device)
-        actions = torch.tensor(target_net_batch['u']).to(self.device)
+        # compute Q values for current states and clip them
+        Q_targets = rewards + self.gamma * next_Q_targets          # Note: last experience of episode is not included
+        Q_targets = torch.clamp(Q_targets, -self.clip_return, 0.)  # clipping
 
-        policy_output = self.actor_target(torch.cat([obs, goal], dim=1))
-        # temporary
-        #self.target_net_pi = policy_output  # action expected
-        self.target_net_q_pi = self.critic_target(torch.cat([obs, goal], dim=1), policy_output)
-        #self.target_net_q = self.critic_target(torch.cat([obs, goal], dim=1), actions)
+        # compute loss
+        Q_expected = self.critic_local(torch.cat([obs, goal], dim=1), actions)
+        critic_loss = F.mse_loss(Q_expected, Q_targets)
 
-        # Q function loss
-        rewards = torch.tensor(local_net_batch['r'].astype(np.float32)).to(self.device)
-        discounted_reward = self.gamma * self.target_net_q_pi
-        target_net = torch.clamp(rewards + discounted_reward, -self.clip_return, 0.)
-        q_loss = torch.nn.MSELoss()(target_net.detach(), self.local_net_q)
-
+        # update weights critic
         self.critic_optimizer.zero_grad()
-        q_loss.backward()
+        critic_loss.backward()
+        torch.nn.utils.clip_grad_norm_(self.critic_local.parameters(), 1)
         self.critic_optimizer.step()
 
-        # policy loss
-        pi_loss = -self.local_net_q_pi.mean()
-        pi_loss += (self.local_net_pi ** 2).mean()
+        # update actor -------------------------------------------------------------
 
+        # compute loss
+        pred_actions = self.actor_local(torch.cat([obs, goal], dim=1))
+        actor_loss = -self.critic_local(torch.cat([obs, goal], dim=1), pred_actions).mean()
+        actor_loss += (pred_actions ** 2).mean()  # minimize actions
+
+        # update weights actor
         self.actor_optimizer.zero_grad()
-        pi_loss.backward()
+        actor_loss.backward()
         self.actor_optimizer.step()
+
 
     def update_target_net(self):
         # ----------------------- update target networks ----------------------- #
@@ -195,4 +188,7 @@ class ddpgAgent(object):
     def save_checkpoint(self, path, name):
         torch.save(self.actor_local.state_dict(), path + '/'+name+'_checkpoint_actor_her.pth')
         torch.save(self.critic_local.state_dict(), path + '/'+name+'_checkpoint_critic_her.pth')
+        self.obs_normalizer.save_normalizer(path + '/'+name+'_obs_normalizer.pth')
+        self.goal_normalizer.save_normalizer(path + '/'+name+'_goal_normalizer.pth')
 
+    # TODO: load checkpoint

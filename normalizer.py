@@ -1,5 +1,6 @@
 import threading
 import numpy as np
+import torch
 
 
 class Normalizer(object):
@@ -51,4 +52,15 @@ class Normalizer(object):
             self.local_sumsq[:] = 0
 
         self.running_mean = self.running_sum / self.running_count
-        self.running_std = np.sqrt(np.maximum(np.square(self.eps), self.running_sum_sq / self.running_count - np.square(self.running_sum/self.running_count)))
+        self.running_std = np.sqrt(np.maximum(np.square(self.eps),
+                                              self.running_sum_sq / self.running_count
+                                              - np.square(self.running_sum/self.running_count)))
+
+    def load_normalizer(self, path):
+        [self.running_mean, self.running_std, self.running_sum, self.running_sum_sq, self.running_count] = \
+            torch.load(path)
+
+    def save_normalizer(self, path):
+        torch.save([self.running_mean, self.running_std, self.running_sum, self.running_sum_sq, self.running_count]
+                   , path)
+
