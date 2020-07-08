@@ -3,14 +3,7 @@ import numpy as np
 
 class RolloutWorker:
     def __init__(self, venv, policy, params, evaluate=False):
-        """Rollout worker generates experience by interacting with one or many environments.
-
-        Args:
-            policy (object): the policy that is used to act
-            dims (dict of ints): the dimensions for observations (o), goals (g), and actions (u)
-            rollout_batch_size (int): the number of parallel rollouts that should be used
-            noise_eps (float): scale of the additive Gaussian noise
-            random_eps (float): probability of selecting a completely random action
+        """generates episodes
         """
         self.venv = venv
         self.policy = policy
@@ -35,8 +28,7 @@ class RolloutWorker:
         self.g = self.obs_dict['desired_goal'].astype(np.float32)
 
     def generate_rollouts(self):
-        """Performs `rollout_batch_size` rollouts in parallel for time horizon `T` with the current
-        policy acting on it accordingly.
+        """
         """
         self.reset_all_rollouts()
 
@@ -56,14 +48,14 @@ class RolloutWorker:
                 random_eps=self.random_eps)
 
             # compute new states and observations
-            actions = actions.cpu().detach().numpy()  # addition!! caution!!
             obs_dict_new, _, done, info = self.venv.step(actions)
             o_new = obs_dict_new['observation']
             ag_new = obs_dict_new['achieved_goal']
             success = np.array([i['is_success'] for i in info])
 
-            # terminate rollouts whenever any env is done. Don't add obs from done envs
-            if any(done): break
+            # assume all environments are done at approximately same number of steps, terminate rollouts
+            if any(done):
+                break
 
             for i, info_dict in enumerate(info):
                 info_values[t, i] = info[i]['is_success']
@@ -76,7 +68,7 @@ class RolloutWorker:
             o[...] = o_new
             ag[...] = ag_new
 
-        self.mean_success = np.mean(np.array(successes)[-1, :])  # success is only on the last timestep
+        self.success_rate = np.mean(np.array(successes)[-1, :])
 
         obs.append(o.copy())
         achieved_goals.append(ag.copy())
@@ -91,7 +83,7 @@ class RolloutWorker:
         episode_batch = {}
         for key in episode.keys():
             val = np.array(episode[key]).copy()
-            # make inputs batch-major instead of time-major
+            # convert an episode to have batch dimension in the first dimension
             episode_batch[key] = val.swapaxes(0, 1)
 
         episode_batch['o'] = np.clip(episode_batch['o'], -self.clip_obs, self.clip_obs)

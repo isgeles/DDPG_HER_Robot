@@ -4,63 +4,51 @@ import torch
 
 
 class Normalizer(object):
-    def __init__(self, size, eps=1e-2, default_clip_range=np.inf):
-        """A normalizer that ensures that observations are approximately distributed according to
-        a standard Normal distribution (i.e. have mean zero and variance one).
-
-        Args:
-            size (int): the size of the observation to be normalized
-            eps (float): a small constant that avoids underflows
-            default_clip_range (float): normalized observations are clipped to be in
-                [-default_clip_range, default_clip_range]
+    def __init__(self, size, eps=1e-2, clip_range=np.inf):
+        """Online standard normalization.
         """
         self.size = size
         self.eps = eps
-        self.default_clip_range = default_clip_range  # always 5
+        self.clip_range = clip_range
+
+        self.mean = np.zeros(self.size, dtype=np.float32)
+        self.std = np.ones(self.size, dtype=np.float32)
+        self.sum = np.zeros(self.size, dtype=np.float32)
+        self.sum_squared = np.zeros(self.size, dtype=np.float32)
+        self.count = 1
 
         self.local_sum = np.zeros(self.size, np.float32)
-        self.local_sumsq = np.zeros(self.size, np.float32)
+        self.local_sum_squared = np.zeros(self.size, np.float32)
         self.local_count = np.zeros(1, np.float32)
 
         self.lock = threading.Lock()
 
-        self.running_mean = np.zeros(self.size, dtype=np.float32)
-        self.running_std = np.ones(self.size, dtype=np.float32)
-        self.running_sum = np.zeros(self.size, dtype=np.float32)
-        self.running_sum_sq = np.zeros(self.size, dtype=np.float32)
-        self.running_count = 1
+    def normalize(self, v):
+        return np.clip((v - self.mean) / self.std, -self.clip_range, self.clip_range).astype(np.float32)
 
     def update(self, v):
         with self.lock:
             self.local_sum += v.sum(axis=0)
-            self.local_sumsq += (np.square(v)).sum(axis=0)
+            self.local_sum_squared += (np.square(v)).sum(axis=0)
             self.local_count[0] += v.shape[0]
-
-    def normalize(self, v):
-        clip_range = self.default_clip_range
-        return np.clip((v - self.running_mean) / self.running_std, -clip_range, clip_range).astype(np.float32)
 
     def recompute_stats(self):
         with self.lock:
-            self.running_count += self.local_count
-            self.running_sum += self.local_sum
-            self.running_sum_sq += self.local_sumsq
+            self.count += self.local_count
+            self.sum += self.local_sum
+            self.sum_squared += self.local_sum_squared
 
-            # reset local
             self.local_count[:] = 0
             self.local_sum[:] = 0
-            self.local_sumsq[:] = 0
+            self.local_sum_squared[:] = 0
 
-        self.running_mean = self.running_sum / self.running_count
-        self.running_std = np.sqrt(np.maximum(np.square(self.eps),
-                                              self.running_sum_sq / self.running_count
-                                              - np.square(self.running_sum/self.running_count)))
+        self.mean = self.sum / self.count
+        self.std = np.sqrt(np.maximum(np.square(self.eps),
+                                      self.sum_squared / self.count - np.square(self.sum/self.count)))
 
     def load_normalizer(self, path):
-        [self.running_mean, self.running_std, self.running_sum, self.running_sum_sq, self.running_count] = \
-            torch.load(path)
+        [self.mean, self.std, self.sum, self.sum_squared, self.count] = torch.load(path)
 
     def save_normalizer(self, path):
-        torch.save([self.running_mean, self.running_std, self.running_sum, self.running_sum_sq, self.running_count]
-                   , path)
+        torch.save([self.mean, self.std, self.sum, self.sum_squared, self.count], path)
 

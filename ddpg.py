@@ -32,7 +32,6 @@ class ddpgAgent(object):
         self.clip_return = params['clip_return']
         self.sample_transitions = params['sample_her_transitions']
         self.gamma = params['gamma']
-
         self.replay_strategy = params['replay_strategy']
 
         self.dimo = self.input_dims['o']
@@ -49,8 +48,8 @@ class ddpgAgent(object):
         self.stage_shapes = stage_shapes
 
         # normalizer
-        self.obs_normalizer = Normalizer(size=self.dimo, eps=self.norm_eps, default_clip_range=self.norm_clip)
-        self.goal_normalizer = Normalizer(size=self.dimg, eps=self.norm_eps, default_clip_range=self.norm_clip)
+        self.obs_normalizer = Normalizer(size=self.dimo, eps=self.norm_eps, clip_range=self.norm_clip)
+        self.goal_normalizer = Normalizer(size=self.dimg, eps=self.norm_eps, clip_range=self.norm_clip)
 
         # networks
         self.actor_local = Actor(self.input_dims).to(self.device)
@@ -72,13 +71,19 @@ class ddpgAgent(object):
         self.buffer = ReplayBuffer(buffer_shapes, buffer_size, self.T, self.sample_transitions)
 
 
-    def act(self, o, g, noise_eps=0., random_eps=0.):
+    def act(self, o, g, noise_eps=0., random_eps=0., testing=False):
 
         obs = self.obs_normalizer.normalize(o)
         goals = self.goal_normalizer.normalize(g)
 
         obs = torch.tensor(obs).to(self.device)
         goals = torch.tensor(goals).to(self.device)
+
+        # for testing single environment
+        if testing:
+            with torch.no_grad():
+                action = self.actor_local(torch.cat([obs, goals], dim=0)).cpu().data.numpy()
+            return action
 
         actions = self.actor_local(torch.cat([obs, goals], dim=1))
 
@@ -94,6 +99,7 @@ class ddpgAgent(object):
                     random_action - actions)  # eps-greedy
 
         actions = torch.clamp(actions, -self.clip_action, self.clip_action)
+        actions = actions.cpu().detach().numpy()
         return actions
 
     def store_episode(self, episode_batch):
@@ -107,7 +113,7 @@ class ddpgAgent(object):
         episode_batch['o_2'] = episode_batch['o'][:, 1:, :]
         episode_batch['ag_2'] = episode_batch['ag'][:, 1:, :]
         shape = episode_batch['u'].shape
-        num_normalizing_transitions = shape[0] * shape[1]  # num_rollouts * (rollout_horizon - 1) --> total steps per cycle
+        num_normalizing_transitions = shape[0] * shape[1]  # num_rollouts * (T - 1), steps every cycle
         transitions = self.sample_transitions(episode_batch, num_normalizing_transitions)
 
         self.obs_normalizer.update(transitions['o'])
@@ -120,11 +126,11 @@ class ddpgAgent(object):
         transitions = self.buffer.sample(self.batch_size)
         return [transitions[key] for key in self.stage_shapes.keys()]
 
-    def train(self):
+    def learn(self):
 
         batch = self.sample_batch()
         batch_dict = OrderedDict([(key, batch[i].astype(np.float32).copy())
-                                 for i, key in enumerate(self.stage_shapes.keys())])
+                                  for i, key in enumerate(self.stage_shapes.keys())])
         batch_dict['r'] = np.reshape(batch_dict['r'], [-1, 1])
 
         # prepare state, action, reward, next state
@@ -151,7 +157,7 @@ class ddpgAgent(object):
         # update weights critic
         self.critic_optimizer.zero_grad()
         critic_loss.backward()
-        torch.nn.utils.clip_grad_norm_(self.critic_local.parameters(), 1)
+        # torch.nn.utils.clip_grad_norm_(self.critic_local.parameters(), 1)
         self.critic_optimizer.step()
 
         # update actor -------------------------------------------------------------
@@ -159,31 +165,23 @@ class ddpgAgent(object):
         # compute loss
         pred_actions = self.actor_local(torch.cat([obs, goal], dim=1))
         actor_loss = -self.critic_local(torch.cat([obs, goal], dim=1), pred_actions).mean()
-        actor_loss += (pred_actions ** 2).mean()  # minimize actions
+        actor_loss += (pred_actions ** 2).mean()  # minimize action moments
 
         # update weights actor
         self.actor_optimizer.zero_grad()
         actor_loss.backward()
         self.actor_optimizer.step()
 
-
-    def update_target_net(self):
-        # ----------------------- update target networks ----------------------- #
-        self.soft_update(self.critic_local, self.critic_target, self.tau)
-        self.soft_update(self.actor_local, self.actor_target, self.tau)
-
-    def soft_update(self, local_model, target_model, tau):
-        """Soft update model parameters.
+    def soft_update_target_networks(self):
+        """Soft update model parameters:
         θ_target = τ*θ_local + (1 - τ)*θ_target
-
-        Params
-        ======
-            local_model: PyTorch model (weights will be copied from)
-            target_model: PyTorch model (weights will be copied to)
-            tau (float): interpolation parameter
         """
-        for target_param, local_param in zip(target_model.parameters(), local_model.parameters()):
-            target_param.data.copy_(tau * local_param.data + (1.0 - tau) * target_param.data)
+        # update critic net
+        for target_param, local_param in zip(self.critic_target.parameters(), self.critic_local.parameters()):
+            target_param.data.copy_(self.tau * local_param.data + (1.0 - self.tau) * target_param.data)
+        # update actor net
+        for target_param, local_param in zip(self.actor_target.parameters(), self.actor_local.parameters()):
+            target_param.data.copy_(self.tau * local_param.data + (1.0 - self.tau) * target_param.data)
 
     def save_checkpoint(self, path, name):
         torch.save(self.actor_local.state_dict(), path + '/'+name+'_checkpoint_actor_her.pth')
@@ -191,4 +189,4 @@ class ddpgAgent(object):
         self.obs_normalizer.save_normalizer(path + '/'+name+'_obs_normalizer.pth')
         self.goal_normalizer.save_normalizer(path + '/'+name+'_goal_normalizer.pth')
 
-    # TODO: load checkpoint
+

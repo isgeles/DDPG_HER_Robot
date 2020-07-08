@@ -16,24 +16,23 @@ from rollout import RolloutWorker
 
 DEFAULT_PARAMS = {
     # environment
-    'env_name': 'FetchPush-v1',               # 'FetchReach-v1', 'FetchPush-v1', 'FetchPickAndPlace-v1', 'FetchSlide-v1'
+    'env_name': 'FetchSlide-v1',               # 'FetchReach-v1', 'FetchPush-v1', 'FetchPickAndPlace-v1', 'FetchSlide-v1'
     'seed': 0,                                # random seed for environment, torch, numpy, random packages
     'T': 50,                                  # maximum episode length
 
     # training setup
     'replay_strategy': 'future',              # 'none' for vanilla ddpg, 'future' for HER
     'num_workers': 16,                        # number of parallel workers with mpi
-    'max_timesteps': 8000000,                 # maximum number of total timesteps, HER paper: 8mil
-    #'n_epochs': 50,                          # number of epochs, HER paper: 200 epochs
-    'n_cycles': 10,                           # number of cycles per epoch, HER paper: 50 cycles TODO
+    'n_epochs': 200,                          # number of epochs, HER paper: 200 epochs (i.e. maximum of 8e6 timesteps)
+    'n_cycles': 50,                           # number of cycles per epoch, HER paper: 50 cycles
     'n_optim': 40,                            # number of optimization steps every cycle
-    'n_test_rollouts': 10,                    # number of rollouts for testing, rollouts are episodes from num_workers
+    'n_eval_rollouts': 10,                    # number of rollouts in evaluation, rollouts are episodes from num_workers
 
     # Agent hyper-parameters
     'lr_actor': 0.001,                        # learning rate actor network
     'lr_critic': 0.001,                       # learning rate critic network
     'buffer_size': int(1e6),                  # replay-buffer size
-    'tau': 0.05,                              # soft update of target network, 1-tau = decay coefficient
+    'tau': 0.05,                              # soft update of network coefficient, 1-tau = polyak coefficient
     'batch_size': 256,                        # batch size per mpi thread
     'gamma': 0.98,                            # discount factor
     'clip_return': 50.,                       # return clipping
@@ -46,9 +45,9 @@ DEFAULT_PARAMS = {
 
     # normalization
     'norm_eps': 0.01,                         # eps for observation normalization
-    'norm_clip': 5,                           # normalized observations are clipped to this values
+    'norm_clip': 5.,                           # normalized observations are clipped to this values
 
-    # location of files for report
+    # location (path) of files for report
     'results_path': './tmp_results'
 }
 
@@ -80,40 +79,38 @@ def dims_and_reward_fun(env_name):
 
 
 def train(agent, rollout_worker, evaluation_worker):
-    """Train DDPG with multiple workers"""
+    """Train DDPG + HER with multiple workers"""
     scores = []
+    print("Training environment", DEFAULT_PARAMS['env_name'], "started...")
+    print("Maximum number of training timesteps is ",
+          DEFAULT_PARAMS['n_epochs'] * DEFAULT_PARAMS['n_cycles'] * DEFAULT_PARAMS['T'] * DEFAULT_PARAMS['num_workers'],
+          "in", DEFAULT_PARAMS['n_epochs'], "epochs with", DEFAULT_PARAMS['num_workers'], "parallel workers.")
 
+    # widget bar to display progress during training
+    widget = ['training loop: ', pb.Percentage(), ' ', pb.Bar(), ' ', pb.ETA()]
+    timer = pb.ProgressBar(widgets=widget, maxval=DEFAULT_PARAMS['n_epochs']).start()
 
-    n_epochs = int(DEFAULT_PARAMS['max_timesteps'] // DEFAULT_PARAMS['n_cycles'] //
-                   DEFAULT_PARAMS['T'] // DEFAULT_PARAMS['num_workers'])
-
-    # widget bar to display progress
-    widget = ['training loop: ', pb.Percentage(), ' ',
-              pb.Bar(), ' ', pb.ETA()]
-    timer = pb.ProgressBar(widgets=widget, maxval=n_epochs).start()
-
-    for epoch in range(n_epochs):
-
+    for epoch in range(DEFAULT_PARAMS['n_epochs']):
         for _ in range(DEFAULT_PARAMS['n_cycles']):
             episode = rollout_worker.generate_rollouts()  # generate episodes with every parallel environment
             agent.store_episode(episode)                  # store experiences as whole episodes
             for _ in range(DEFAULT_PARAMS['n_optim']):    # optimize target network
-                agent.train()
-            agent.update_target_net()                     # update target network
+                agent.learn()
+            agent.soft_update_target_networks()           # update target network
 
-        # testing agent for report
-        test_scores = []
-        for _ in range(DEFAULT_PARAMS['n_test_rollouts']):
+        # evaluating agent for report
+        eval_scores = []
+        for _ in range(DEFAULT_PARAMS['n_eval_rollouts']):
             evaluation_worker.generate_rollouts()
-            test_scores.append(evaluation_worker.mean_success)
-        print('\n \tEpoch: {} / {}, Success: {:.4f}'.format(epoch, n_epochs, np.mean(test_scores)))
-        scores.append(np.mean(test_scores))
+            eval_scores.append(evaluation_worker.success_rate)
+        print('\n \tEpoch: {} / {}, Success: {:.4f}'.format(epoch, DEFAULT_PARAMS['n_epochs'], np.mean(eval_scores)))
+        scores.append(np.mean(eval_scores))
 
         # different threads use different seeds
         MPI.COMM_WORLD.Bcast(np.random.uniform(size=(1,)), root=0)
         timer.update(epoch)
-    agent.save_checkpoint(DEFAULT_PARAMS['results_path'], DEFAULT_PARAMS['env_name'])
     timer.finish()
+
     return scores
 
 
@@ -133,12 +130,14 @@ def main():
 
     scores = train(agent, rollout_worker, evaluation_worker)
 
-    # save stats for report
-    np.savetxt(DEFAULT_PARAMS['results_path']+'/scores_'+DEFAULT_PARAMS['env_name']+'.csv', scores, delimiter=',')
+    # save networks and stats
+    agent.save_checkpoint(DEFAULT_PARAMS['results_path'], DEFAULT_PARAMS['env_name'])
+    np.savetxt(DEFAULT_PARAMS['results_path']+'/scores_'+DEFAULT_PARAMS['env_name']+'_'+
+               str(seed)+'.csv', scores, delimiter=',')
     fig = plt.figure()
     fig.add_subplot(111)
     plt.plot(np.arange(len(scores)), scores)
-    plt.savefig(DEFAULT_PARAMS['results_path']+'/scores_'+DEFAULT_PARAMS['env_name']+'.png')
+    plt.savefig(DEFAULT_PARAMS['results_path']+'/scores_'+DEFAULT_PARAMS['env_name']+'_'+str(seed)+'.png')
     plt.show()
 
 
