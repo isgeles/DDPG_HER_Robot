@@ -2,13 +2,14 @@ import numpy as np
 
 
 def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
-    """Creates a sample function that can be used for HER experience replay.
-    Args:
-        replay_strategy (in ['future', 'none']): the HER replay strategy; if set to 'none',
+    """
+    Creates a sample function that can be used for HER experience replay.
+    @param replay_strategy: (in ['future', 'none']) the HER replay strategy; if set to 'none',
             regular DDPG experience replay is used
-        replay_k (int): the ratio between HER replays and regular replays (e.g. k = 4 -> 4 times
+    @param replay_k: (int) the ratio between HER replays and regular replays (e.g. k = 4 -> 4 times
             as many HER replays as regular replays are used)
-        reward_fun (function): function to re-compute the reward with substituted goals
+    @param reward_fun: (function): function to re-compute the reward with substituted goals
+    @return: transitions
     """
     if replay_strategy == 'future':
         future_p = 1 - (1. / (1 + replay_k))
@@ -16,7 +17,12 @@ def make_sample_her_transitions(replay_strategy, replay_k, reward_fun):
         future_p = 0
 
     def _sample_her_transitions(episode_batch, batch_size_in_transitions):
-        """episode_batch is {key: array(buffer_size x T x dim_key)}
+        """
+        Sampling the transitions with substituting goals for HER.
+        @param episode_batch: {key: array(buffer_size x T x dim_key)} containing observation 'o', achieved goal 'ag',
+        goal 'g', action 'u', reward 'r', info (i.e. success)
+        @param batch_size_in_transitions: batch size of transitions
+        @return: transitions
         """
         T = episode_batch['u'].shape[1]                   # episode (rollouts) horizon
         rollout_batch_size = episode_batch['u'].shape[0]  # equals to number of workers

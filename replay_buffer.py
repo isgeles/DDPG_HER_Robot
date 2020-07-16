@@ -4,14 +4,12 @@ import numpy as np
 
 class ReplayBuffer:
     def __init__(self, buffer_shapes, size_in_transitions, T, sample_transitions):
-        """Creates a replay buffer.
-
-        Args:
-            buffer_shapes (dict of ints): the shape for all buffers that are used in the replay
-                buffer
-            size_in_transitions (int): the size of the buffer, measured in transitions
-            T (int): the time horizon for episodes
-            sample_transitions (function): a function that samples from the replay buffer
+        """
+        Creates a replay.
+        @param buffer_shapes: (dict of ints) the shape for all buffers that are used in the replay buffer
+        @param size_in_transitions: (int) the size of the buffer, measured in transitions
+        @param T: (int) the time horizon for episodes (episode length)
+        @param sample_transitions: a function that samples from the replay buffer
         """
         self.size = size_in_transitions // T
         self.sample_transitions = sample_transitions
@@ -21,7 +19,10 @@ class ReplayBuffer:
         self.lock = threading.Lock()
 
     def sample(self, batch_size):
-        """Returns a dict {key: array(batch_size x shapes[key])}
+        """
+        Returns a dict from the saved samples in the buffer: {key: array(batch_size x shapes[key])}
+        @param batch_size: size of batch for learning step of agent
+        @return: sample transitions
         """
         buffers = {}
 
@@ -36,7 +37,9 @@ class ReplayBuffer:
         return self.sample_transitions(buffers, batch_size)
 
     def store_episode(self, episode_batch):
-        """episode_batch: array(batch_size x (T or T+1) x dim_key)
+        """
+        Store episode from batch to buffer. Observation 'o' is of size T+1, others are of size T.
+        @param episode_batch: array(batch_size x (T or T+1) x dim_key)
         """
         batch_size = len(episode_batch['u'])
         with self.lock:
@@ -45,8 +48,11 @@ class ReplayBuffer:
                 self.buffers[key][idxs] = episode_batch[key]
 
     def _get_storage_idx(self, inc=1):
-        """Returns to you the indexes where you will write in the buffer.
+        """
+        Returns to you the indexes where you will write in the buffer.
         These are consecutive until you hit the end, then they are random.
+        @param inc: incrementing stepsize in buffer, usually 1
+        @return: index where to store in buffer
         """
         if self.current_size+inc <= self.size:
             idx = np.arange(self.current_size, self.current_size+inc)

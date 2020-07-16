@@ -3,7 +3,13 @@ import numpy as np
 
 class RolloutWorker:
     def __init__(self, venv, policy, params, evaluate=False):
-        """generates episodes
+        """
+        Generate episodes from vectorized gym environment.
+        @param venv: vectorized (parallel) environments
+        @param policy: actions are determined according to this policy
+        @param params: dict containing all necessary parameters:
+        dims, T (episode length), num_workers, clip_obs, noise_eps, random_eps
+        @param evaluate: (bool) sets noise to zero if evaluating
         """
         self.venv = venv
         self.policy = policy
@@ -22,6 +28,9 @@ class RolloutWorker:
         self.counter = 0
 
     def reset_all_rollouts(self):
+        """
+        Reset all environments and set initial observations.
+        """
         self.obs_dict = self.venv.reset()
         self.initial_o = self.obs_dict['observation']
         self.initial_ag = self.obs_dict['achieved_goal']
@@ -29,6 +38,8 @@ class RolloutWorker:
 
     def generate_rollouts(self):
         """
+        Generating rollouts i.e. batch of episodes from all parallel environments.
+        @return: episode batch
         """
         self.reset_all_rollouts()
 

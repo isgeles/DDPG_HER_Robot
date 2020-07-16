@@ -1,6 +1,4 @@
-# taken from openai baselines (github)
-# with minor edits
-#
+# modified code from https://github.com/openai/baselines/tree/master/baselines/common
 
 from abc import ABC, abstractmethod
 import multiprocessing as mp
@@ -9,9 +7,8 @@ import gym
 
 class CloudpickleWrapper(object):
     """
-    Uses cloudpickle to serialize contents (otherwise multiprocessing tries to use pickle)
+    Uses cloudpickle to serialize contents (otherwise multiprocessing tries to use pickle).
     """
-
     def __init__(self, x):
         self.x = x
 
@@ -28,7 +25,6 @@ class VecEnv(ABC):
     """
     An abstract asynchronous, vectorized environment.
     """
-
     def __init__(self, num_envs, observation_space, action_space):
         self.num_envs = num_envs
         self.observation_space = observation_space
@@ -126,7 +122,6 @@ class parallelEnv(VecEnv):
     VecEnv that runs multiple environments in parallel in subproceses and communicates with them via pipes.
     Recommended to use when num_envs > 1 and step() can be a bottleneck.
     """
-
     def __init__(self, env_name,
                  n=4, seed=None,
                  spaces=None):
@@ -137,10 +132,8 @@ class parallelEnv(VecEnv):
             for i, e in enumerate(env_fns):
                 e.seed(i + seed)
 
-        """
-        envs: list of gym environments to run in subprocesses
-        adopted from openai baseline
-        """
+        # envs: list of gym environments to run in subprocesses
+
         self.waiting = False
         self.closed = False
         nenvs = len(env_fns)
@@ -192,6 +185,11 @@ class parallelEnv(VecEnv):
 
 
 def _flatten_obs(obs):
+    """
+    Flatten observations in form of dicts.
+    @param obs: (dict) contains the observations
+    @return: stacked observations
+    """
     assert isinstance(obs, (list, tuple))
     assert len(obs) > 0
 

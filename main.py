@@ -1,6 +1,6 @@
 import numpy as np
-import random
 import torch
+import random
 import gym
 import mujoco_py
 
@@ -14,7 +14,7 @@ from parallelEnvironment import parallelEnv
 
 DEFAULT_PARAMS = {
     # environment
-    'env_name': 'FetchSlide-v1',               # 'FetchReach-v1', 'FetchPush-v1', 'FetchPickAndPlace-v1', 'FetchSlide-v1'
+    'env_name': 'FetchReach-v1',               # 'FetchReach-v1', 'FetchPush-v1', 'FetchPickAndPlace-v1', 'FetchSlide-v1'
     'seed': 3,                                # random seed for environment, torch, numpy, random packages
     'T': 50,                                  # maximum episode length
 
@@ -50,19 +50,27 @@ DEFAULT_PARAMS = {
 }
 
 
-def set_seeds(seed=0):
-    """Set the random seed to all packages. Note: parallel workers will have different seeds in parallel environments."""
+def set_seeds(seed: int = 0):
+    """
+    Set the random seed to all packages.
+    Note: Parallel workers will have different seeds in each environment based on this seed.
+    @param seed: (int) seed for torch, numpy, random. By default zero.
+    """
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     torch.manual_seed(seed)
     torch.cuda.manual_seed_all(seed)
     np.random.seed(seed)
     random.seed(seed)
-    return seed
+    pass
 
 
-def dims_and_reward_fun(env_name):
-    """Get dimensions of observations, action, goal and the used reward function."""
+def dims_and_reward_fun(env_name: str):
+    """
+    Get dimensions of observations, action, goal and the used reward function.
+    @param env_name: (str) name of gym environment
+    @return: dict for dimensions, reward function of environment
+    """
     env = gym.make(env_name)
     env.reset()
     obs, _, _, _ = env.step(env.action_space.sample())
@@ -76,7 +84,13 @@ def dims_and_reward_fun(env_name):
 
 
 def train(agent, rollout_worker, evaluation_worker):
-    """Train DDPG + HER with multiple workers"""
+    """
+    Train DDPG (+ HER is optional) with multiple workers and save values to scores.
+    @param agent: (object) DDPG agent
+    @param rollout_worker: (object) worker for training the networks
+    @param evaluation_worker: (object) worker for evaluating current networks
+    @return: scores i.e. success-rate of agent from evaluating worker in a list
+    """
     scores = []
     print("Training environment", DEFAULT_PARAMS['env_name'], "started...")
     print("Maximum number of training timesteps is ",
@@ -109,9 +123,12 @@ def train(agent, rollout_worker, evaluation_worker):
 
 
 def main():
-    seed = set_seeds(DEFAULT_PARAMS['seed'])
+    """
+    Main function: Training ddpg agent (optional with HER) as defined in DEFAULT_PARAMS and saving stats.
+    """
+    set_seeds(DEFAULT_PARAMS['seed'])
 
-    env = parallelEnv(DEFAULT_PARAMS['env_name'], n=DEFAULT_PARAMS['num_workers'], seed=seed)
+    env = parallelEnv(DEFAULT_PARAMS['env_name'], n=DEFAULT_PARAMS['num_workers'], seed=DEFAULT_PARAMS['seed'])
 
     DEFAULT_PARAMS['dims'], DEFAULT_PARAMS['reward_fun'] = dims_and_reward_fun(DEFAULT_PARAMS['env_name'])
 
@@ -127,14 +144,14 @@ def main():
 
     # save networks and stats ------------------------------------------------------------------------------------------
     agent.save_checkpoint(DEFAULT_PARAMS['results_path'], DEFAULT_PARAMS['env_name'])
-    np.savetxt(DEFAULT_PARAMS['results_path']+'/scores_'+DEFAULT_PARAMS['env_name']+'_'+
-               str(seed)+'.csv', scores, delimiter=',')
+    np.savetxt(DEFAULT_PARAMS['results_path']+'/scores_'+DEFAULT_PARAMS['env_name']+'_' +
+               str(DEFAULT_PARAMS['seed'])+'.csv', scores, delimiter=',')
     fig = plt.figure()
     fig.add_subplot(111)
     plt.plot(np.arange(len(scores)), scores)
-    plt.savefig(DEFAULT_PARAMS['results_path']+'/scores_'+DEFAULT_PARAMS['env_name']+'_'+str(seed)+'.png')
+    plt.savefig(DEFAULT_PARAMS['results_path']+'/scores_'+DEFAULT_PARAMS['env_name']+'_' +
+                str(DEFAULT_PARAMS['seed'])+'.png')
     plt.show()
-
 
 if __name__ == '__main__':
     main()

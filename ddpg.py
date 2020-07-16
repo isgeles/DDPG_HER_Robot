@@ -12,7 +12,11 @@ from replay_buffer import ReplayBuffer
 
 class ddpgAgent(object):
     def __init__(self, params):
-        """Implementation of DDPG with Hindsight Experience Replay (HER).
+        """
+        Implementation of DDPG agent with Hindsight Experience Replay (HER) sampler.
+        @param params: dict containing all necessary parameters:
+        dims, buffer_size, tau (= 1-polyak), batch_size, lr_critic, lr_actor, norm_eps, norm_clip, clip_obs,
+        clip_action, T (episode length), num_workers, clip_return, sample_her_transitions, gamma, replay_strategy
         """
         self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
@@ -72,6 +76,15 @@ class ddpgAgent(object):
 
 
     def act(self, o, g, noise_eps=0., random_eps=0., testing=False):
+        """
+        Choose action from observations with probability 'random_eps' at random,
+        else use actor output and add noise 'noise_eps'
+        @param o: observation
+        @param g: desired goal
+        @param noise_eps: noise added to action
+        @param random_eps: random action probability
+        @param testing: (bool) set to 'True' if testing a single environment
+        """
 
         obs = self.obs_normalizer.normalize(o)
         goals = self.goal_normalizer.normalize(g)
@@ -104,8 +117,9 @@ class ddpgAgent(object):
 
     def store_episode(self, episode_batch):
         """
-        episode_batch: array of batch_size x (T or T+1) x dim_key
-                       'o' is of size T+1, others are of size T
+        Store episodes to replay buffer.
+        @param episode_batch: array of batch_size x (T or T+1) x dim_key.
+        Observation 'o' is of size T+1, others are of size T
         """
         self.buffer.store_episode(episode_batch)
 
@@ -117,17 +131,23 @@ class ddpgAgent(object):
         transitions = self.sample_transitions(episode_batch, num_normalizing_transitions)
 
         self.obs_normalizer.update(transitions['o'])
-        self.obs_normalizer.recompute_stats()
-
         self.goal_normalizer.update(transitions['g'])
+
+        self.obs_normalizer.recompute_stats()
         self.goal_normalizer.recompute_stats()
 
     def sample_batch(self):
+        """
+        Sample random transitions from replay buffer (which also contains HER samples).
+        @return: transitions
+        """
         transitions = self.buffer.sample(self.batch_size)
         return [transitions[key] for key in self.stage_shapes.keys()]
 
     def learn(self):
-
+        """
+        learning step i.e. optimizing the network.
+        """
         batch = self.sample_batch()
         batch_dict = OrderedDict([(key, batch[i].astype(np.float32).copy())
                                   for i, key in enumerate(self.stage_shapes.keys())])
@@ -173,8 +193,8 @@ class ddpgAgent(object):
         self.actor_optimizer.step()
 
     def soft_update_target_networks(self):
-        """Soft update model parameters:
-        θ_target = τ*θ_local + (1 - τ)*θ_target
+        """
+        Soft update model parameters: θ_target = τ*θ_local + (1 - τ)*θ_target
         """
         # update critic net
         for target_param, local_param in zip(self.critic_target.parameters(), self.critic_local.parameters()):
@@ -184,6 +204,11 @@ class ddpgAgent(object):
             target_param.data.copy_(self.tau * local_param.data + (1.0 - self.tau) * target_param.data)
 
     def save_checkpoint(self, path, name):
+        """
+        Save actor, critic networks and the stats for normalization to the path.
+        @param path: path to store checkpoints
+        @param name: (str) name of environment, for naming files
+        """
         torch.save(self.actor_local.state_dict(), path + '/'+name+'_checkpoint_actor_her.pth')
         torch.save(self.critic_local.state_dict(), path + '/'+name+'_checkpoint_critic_her.pth')
         self.obs_normalizer.save_normalizer(path + '/'+name+'_obs_normalizer.pth')

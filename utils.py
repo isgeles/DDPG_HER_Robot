@@ -1,18 +1,14 @@
-import numpy as np
-import random
-import copy
 import matplotlib.pyplot as plt
 from matplotlib import animation
 from IPython.display import HTML
 from IPython.display import display
 from PIL import Image
-import torch
 
-def animate_frames(frames, jupyter=False):
+def animate_frames(frames, jupyter=True):
     """
-    Animate frames from array with ipython HTML extension for jupyter.
-    :param frames: list of frames
-    :param jupyter: boolean, for using jupyter extension
+    Animate frames from array (with ipython HTML extension for jupyter).
+    @param frames: list of frames
+    @param jupyter: (bool), for using jupyter notebook extension to display animation
     """
     fig, ax = plt.subplots(figsize=(12, 10))
     plt.axis('off')
@@ -31,8 +27,8 @@ def animate_frames(frames, jupyter=False):
 
 def save_gif(frames):
     """
-    Save animation of frames to gif-file.
-    :param frames: list of frames
+    Save animation of frames to gif-file in working directory.
+    @param frames: list of frames
     """
     images = [Image.fromarray(frames[i]) for i in range(len(frames))]
     with open('./openai_gym.gif', 'wb+') as f:  # change the path if necessary
