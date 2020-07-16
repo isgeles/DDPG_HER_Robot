@@ -99,7 +99,7 @@ class ddpgAgent(object):
                     random_action - actions)  # eps-greedy
 
         actions = torch.clamp(actions, -self.clip_action, self.clip_action)
-        actions = actions.cpu().detach().numpy()
+
         return actions
 
     def store_episode(self, episode_batch):

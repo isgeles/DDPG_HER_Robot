@@ -3,26 +3,24 @@ import random
 import torch
 import gym
 import mujoco_py
-from mpi4py import MPI
 
 import progressbar as pb           # tracking time while training
 import matplotlib.pyplot as plt    # plotting scores
 
 from ddpg import ddpgAgent
-from her_sampler import make_sample_her_transitions
-from parallelEnv.cmd_util import make_vec_env
 from rollout import RolloutWorker
-
+from her_sampler import make_sample_her_transitions
+from parallelEnvironment import parallelEnv
 
 DEFAULT_PARAMS = {
     # environment
     'env_name': 'FetchSlide-v1',               # 'FetchReach-v1', 'FetchPush-v1', 'FetchPickAndPlace-v1', 'FetchSlide-v1'
-    'seed': 0,                                # random seed for environment, torch, numpy, random packages
+    'seed': 3,                                # random seed for environment, torch, numpy, random packages
     'T': 50,                                  # maximum episode length
 
     # training setup
     'replay_strategy': 'future',              # 'none' for vanilla ddpg, 'future' for HER
-    'num_workers': 16,                        # number of parallel workers with mpi
+    'num_workers': 16,                        # number of parallel workers
     'n_epochs': 200,                          # number of epochs, HER paper: 200 epochs (i.e. maximum of 8e6 timesteps)
     'n_cycles': 50,                           # number of cycles per epoch, HER paper: 50 cycles
     'n_optim': 40,                            # number of optimization steps every cycle
@@ -33,15 +31,15 @@ DEFAULT_PARAMS = {
     'lr_critic': 0.001,                       # learning rate critic network
     'buffer_size': int(1e6),                  # replay-buffer size
     'tau': 0.05,                              # soft update of network coefficient, 1-tau = polyak coefficient
-    'batch_size': 256,                        # batch size per mpi thread
+    'batch_size': 256,                        # batch size per thread
     'gamma': 0.98,                            # discount factor
     'clip_return': 50.,                       # return clipping
     'clip_obs': 200.,                         # observation clipping
     'clip_action': 1.,                        # action clipping
 
     # exploration
-    'random_eps': 0.3,                        # probability of random action in hypercube of possible actions
-    'noise_eps': 0.2,                        # std of gaussian noise added actions
+    'random_eps': 0.2,                        # probability of random action in hypercube of possible actions
+    'noise_eps': 0.05,                        # std of gaussian noise added actions
 
     # normalization
     'norm_eps': 0.01,                         # eps for observation normalization
@@ -53,7 +51,7 @@ DEFAULT_PARAMS = {
 
 
 def set_seeds(seed=0):
-    """Set the random seed to all packages. Note: MPI workers will have different seeds in parallel environments."""
+    """Set the random seed to all packages. Note: parallel workers will have different seeds in parallel environments."""
     torch.backends.cudnn.deterministic = True
     torch.backends.cudnn.benchmark = False
     torch.manual_seed(seed)
@@ -74,8 +72,7 @@ def dims_and_reward_fun(env_name):
         'g': obs['desired_goal'].shape[0],
         'info_is_success': 1,
     }
-    DEFAULT_PARAMS['dims'] = dims
-    DEFAULT_PARAMS['reward_fun'] = env.compute_reward
+    return dims, env.compute_reward
 
 
 def train(agent, rollout_worker, evaluation_worker):
@@ -106,20 +103,18 @@ def train(agent, rollout_worker, evaluation_worker):
         print('\n \tEpoch: {} / {}, Success: {:.4f}'.format(epoch, DEFAULT_PARAMS['n_epochs'], np.mean(eval_scores)))
         scores.append(np.mean(eval_scores))
 
-        # different threads use different seeds
-        MPI.COMM_WORLD.Bcast(np.random.uniform(size=(1,)), root=0)
         timer.update(epoch)
     timer.finish()
-
     return scores
 
 
 def main():
     seed = set_seeds(DEFAULT_PARAMS['seed'])
-    env = make_vec_env(DEFAULT_PARAMS['env_name'], DEFAULT_PARAMS['num_workers'], seed=seed,
-                       flatten_dict_observations=False)
 
-    dims_and_reward_fun(DEFAULT_PARAMS['env_name'])
+    env = parallelEnv(DEFAULT_PARAMS['env_name'], n=DEFAULT_PARAMS['num_workers'], seed=seed)
+
+    DEFAULT_PARAMS['dims'], DEFAULT_PARAMS['reward_fun'] = dims_and_reward_fun(DEFAULT_PARAMS['env_name'])
+
     DEFAULT_PARAMS['sample_her_transitions'] = make_sample_her_transitions(
         replay_strategy=DEFAULT_PARAMS['replay_strategy'], replay_k=4, reward_fun=DEFAULT_PARAMS['reward_fun'])
 
@@ -130,7 +125,7 @@ def main():
 
     scores = train(agent, rollout_worker, evaluation_worker)
 
-    # save networks and stats
+    # save networks and stats ------------------------------------------------------------------------------------------
     agent.save_checkpoint(DEFAULT_PARAMS['results_path'], DEFAULT_PARAMS['env_name'])
     np.savetxt(DEFAULT_PARAMS['results_path']+'/scores_'+DEFAULT_PARAMS['env_name']+'_'+
                str(seed)+'.csv', scores, delimiter=',')
