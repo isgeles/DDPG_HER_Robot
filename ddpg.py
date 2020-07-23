@@ -6,14 +6,14 @@ import torch.nn.functional as F
 
 from model import Actor, Critic
 from collections import OrderedDict
-from normalizer import Normalizer
+from utils import Normalizer
 from replay_buffer import ReplayBuffer
 
 
 class ddpgAgent(object):
     def __init__(self, params):
-        """
-        Implementation of DDPG agent with Hindsight Experience Replay (HER) sampler.
+        """Implementation of DDPG agent with Hindsight Experience Replay (HER) sampler.
+
         @param params: dict containing all necessary parameters:
         dims, buffer_size, tau (= 1-polyak), batch_size, lr_critic, lr_actor, norm_eps, norm_clip, clip_obs,
         clip_action, T (episode length), num_workers, clip_return, sample_her_transitions, gamma, replay_strategy
@@ -76,9 +76,9 @@ class ddpgAgent(object):
 
 
     def act(self, o, g, noise_eps=0., random_eps=0., testing=False):
-        """
-        Choose action from observations with probability 'random_eps' at random,
+        """Choose action from observations with probability 'random_eps' at random,
         else use actor output and add noise 'noise_eps'
+
         @param o: observation
         @param g: desired goal
         @param noise_eps: noise added to action
@@ -116,8 +116,8 @@ class ddpgAgent(object):
         return actions
 
     def store_episode(self, episode_batch):
-        """
-        Store episodes to replay buffer.
+        """Store episodes to replay buffer.
+
         @param episode_batch: array of batch_size x (T or T+1) x dim_key.
         Observation 'o' is of size T+1, others are of size T
         """
@@ -137,16 +137,15 @@ class ddpgAgent(object):
         self.goal_normalizer.recompute_stats()
 
     def sample_batch(self):
-        """
-        Sample random transitions from replay buffer (which also contains HER samples).
+        """Sample random transitions from replay buffer (which also contains HER samples).
+
         @return: transitions
         """
         transitions = self.buffer.sample(self.batch_size)
         return [transitions[key] for key in self.stage_shapes.keys()]
 
     def learn(self):
-        """
-        learning step i.e. optimizing the network.
+        """learning step i.e. optimizing the network.
         """
         batch = self.sample_batch()
         batch_dict = OrderedDict([(key, batch[i].astype(np.float32).copy())
@@ -193,8 +192,8 @@ class ddpgAgent(object):
         self.actor_optimizer.step()
 
     def soft_update_target_networks(self):
-        """
-        Soft update model parameters: θ_target = τ*θ_local + (1 - τ)*θ_target
+        """Soft update model parameters:
+            θ_target = τ*θ_local + (1 - τ)*θ_target
         """
         # update critic net
         for target_param, local_param in zip(self.critic_target.parameters(), self.critic_local.parameters()):
@@ -204,8 +203,8 @@ class ddpgAgent(object):
             target_param.data.copy_(self.tau * local_param.data + (1.0 - self.tau) * target_param.data)
 
     def save_checkpoint(self, path, name):
-        """
-        Save actor, critic networks and the stats for normalization to the path.
+        """Save actor, critic networks and the stats for normalization to the path.
+
         @param path: path to store checkpoints
         @param name: (str) name of environment, for naming files
         """

@@ -43,6 +43,7 @@ class Actor(nn.Module):
     def forward(self, state):
         """
         Build an actor (policy) network that maps states to actions.
+        @param state: input state of network
         """
         x = F.relu(self.fc1(state))
         x = F.relu(self.fc2(x))
@@ -59,7 +60,7 @@ class Critic(nn.Module):
         Initialize parameters and build model.
         @param dims: dict containing dimensions for input layer ('o' and 'g' ) and output layer ('a')
         @param fcs1_units: (int) number units in the first hidden layer
-        @param fc2_units: (int) number units in the second hidden layer (actions added here to critic)
+        @param fc2_units: (int) number units in the second hidden layer (actions added to critic)
         @param fc3_units: (int) number units in the third hidden layer
         """
         super(Critic, self).__init__()
@@ -84,6 +85,8 @@ class Critic(nn.Module):
     def forward(self, state, action):
         """
         Build a critic (value) network that maps (state, action) pairs to Q-values.
+        @param state: input state to critic net
+        @param action: input action to critic net
         """
         xs = F.relu(self.fcs1(state))
         action = action.float()

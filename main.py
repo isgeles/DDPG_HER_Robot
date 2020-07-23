@@ -14,7 +14,7 @@ from parallelEnvironment import parallelEnv
 
 DEFAULT_PARAMS = {
     # environment
-    'env_name': 'FetchReach-v1',               # 'FetchReach-v1', 'FetchPush-v1', 'FetchPickAndPlace-v1', 'FetchSlide-v1'
+    'env_name': 'FetchSlide-v1',              # 'FetchReach-v1', 'FetchPush-v1', 'FetchPickAndPlace-v1', 'FetchSlide-v1'
     'seed': 3,                                # random seed for environment, torch, numpy, random packages
     'T': 50,                                  # maximum episode length
 
