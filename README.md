@@ -5,7 +5,35 @@ Used Algorithms:
 - DDPG with Hindsight Experience Replay (DDPG+HER)
 
 
+### Environments
+
+There are 4 different tasks to be solved in the openai robotic Fetch gym (arm with 7 DOF), with the mujoco physics simulator:
+ > - Reach  (observation space: 10 observations, 3 achieved goal, 3 desired goal)
+ > - Push  (observation space: 25 observations, 3 achieved goal, 3 desired goal)
+ > - PickAndPlace  (observation space: 25 observations, 3 achieved goal, 3 desired goal)
+ > - Slide  (observation space: 25 observations, 3 achieved goal, 3 desired goal)
+
+in a episode of 50 timesteps, where the target position is always visualised in red.
+
+For every timestep where the target position is not reached, the agent receives an reward of -1.
+
+The algorithm DDPG with standard experience replay fails to learn in these environements, however with Hindsight Experience Replay (HER) the tasks can be solved.
+
+
 ### Results
+
+Below you can see the success-rate over 200 epochs (1 epoch = 50 cycles = 16 episodes) for all the different Fetch environments (and random seed = 0).
+
+FetchReach-v1| FetchPush-v1
+-----------------------|-----------------------|
+![](./trained/Reach/seed0/scores_FetchReach-v1_0.png)| ![](./trained/Push/seed0/scores_FetchPush-v1_0.png)
+
+FetchPickAndPlace-v1| FetchSlide-v1
+-----------------------|-----------------------|
+![](./trained/PickAndPlace/seed0/scores_FetchPickAndPlace-v1_0.png)| ![](./trained/Slide/seed0/scores_FetchSlide-v1_0.png)
+
+
+### Watch trained agents:
 
 FetchReach-v1| FetchPush-v1
 -----------------------|-----------------------|
