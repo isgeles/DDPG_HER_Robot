@@ -8,10 +8,10 @@ Used Algorithms:
 ### Environments
 
 There are 4 different tasks to be solved in the openai robotic Fetch gym (arm with 7 DOF), with the mujoco physics simulator:
- > - Reach  (observation space: 10 observations, 3 achieved goal, 3 desired goal)
- > - Push  (observation space: 25 observations, 3 achieved goal, 3 desired goal)
- > - PickAndPlace  (observation space: 25 observations, 3 achieved goal, 3 desired goal)
- > - Slide  (observation space: 25 observations, 3 achieved goal, 3 desired goal)
+ - Reach  (observation space: 10 observations, 3 achieved goal, 3 desired goal)
+ - Push  (observation space: 25 observations, 3 achieved goal, 3 desired goal)
+ - PickAndPlace  (observation space: 25 observations, 3 achieved goal, 3 desired goal)
+ - Slide  (observation space: 25 observations, 3 achieved goal, 3 desired goal)
 
 in a episode of 50 timesteps, where the target position is always visualised in red.
 
@@ -19,7 +19,7 @@ For every timestep where the target position is not reached, the agent receives 
 
 The action-space is a vector of 4 values (x,y,z, gripper), the gripper value is irrelevant for all environements except for PickAndPlace.
 
-The algorithm DDPG with standard experience replay fails to learn in these environements, however with Hindsight Experience Replay (HER) the tasks can be solved.
+The algorithm DDPG with standard experience replay fails to learn in these environements, however with [Hindsight Experience Replay](https://arxiv.org/abs/1707.01495) (HER) the tasks can be solved.
 
 
 ### Results
@@ -60,6 +60,13 @@ FetchPickAndPlace-v1| FetchSlide-v1
     ├── rollout.py
     ├── utils.py
     └── README.md
+    
+### Relevant Papers and Acknowledgements
+ > [Hindsight Experience Replay](https://arxiv.org/abs/1707.01495) 
+ 
+ > [Continuous control with deep reinforcement learning](https://arxiv.org/abs/1509.02971)
+ 
+ > [Openai baselines](https://github.com/openai/baselines)
 
 
 ### Python Packages
