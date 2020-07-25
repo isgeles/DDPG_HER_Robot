@@ -1,4 +1,4 @@
-# Fetch Robotic Gym Environment solved in Pytorch (DDPG+HER)
+# Fetch Robotic Gym Environment solved in Pytorch with DDPG+HER
 
 Used Algorithms:
 - Deep Deterministic Policy Gradient (DDPG)
@@ -19,7 +19,7 @@ For every timestep where the target position is not reached, the agent receives 
 
 The action-space is a vector of 4 values (x,y,z, gripper), the gripper value is irrelevant for all environements except for PickAndPlace.
 
-The algorithm DDPG with standard experience replay fails to learn in these environements, however with [Hindsight Experience Replay](https://arxiv.org/abs/1707.01495) (HER) the tasks can be solved.
+The DDPG algorithm with standard experience replay fails to learn in these environements (except for FetchReach-v1), however with [Hindsight Experience Replay](https://arxiv.org/abs/1707.01495) (HER) all the tasks can be solved.
 
 
 ### Results
@@ -50,15 +50,15 @@ FetchPickAndPlace-v1| FetchSlide-v1
     .
     ├── tmp_results/                       # folder for storing new results
     ├── trained/                           # stored gifs, weights for trained networks and results for different seeds 
-    ├── agent_demo.ipynb
-    ├── ddpg.py
-    ├── her_sampler.py
-    ├── main.py
-    ├── model.py
-    ├── parallelEnvironment.py 
-    ├── replay_buffer.py
-    ├── rollout.py
-    ├── utils.py
+    ├── agent_demo.ipynb                   # demonatrating the environment and results inside a iPython notebook 
+    ├── ddpg.py                            # DDPG agent implmented
+    ├── her_sampler.py                     # generating HER samples from episodes in replay-buffer
+    ├── main.py                            # main code where training setup is defined
+    ├── model.py                           # Pytorch model (3 layers, 256 nodes each)
+    ├── parallelEnvironment.py             # vectorize environement for paralllel computing (from openai baselines subprocvec)
+    ├── replay_buffer.py                   # buffer to store experiences (as episodes)
+    ├── rollout.py                         # worker to generate episodes of experiences
+    ├── utils.py                           # generate iPython display viewer (also saving gifs); online normalizer for network input
     └── README.md
     
 ### Relevant Papers and Acknowledgements
