@@ -15,7 +15,9 @@ There are 4 different tasks to be solved in the openai robotic Fetch gym (arm wi
 
 in a episode of 50 timesteps, where the target position is always visualised in red.
 
-For every timestep where the target position is not reached, the agent receives an reward of -1.
+For every timestep where the target position is not reached, the agent receives an reward of -1. If the agent fails to reach the goal until the end of an episode it is considered unsuccessful.
+
+The action-space is a vector of 4 values (x,y,z, gripper), the gripper value is irrelevant for all environements except for PickAndPlace.
 
 The algorithm DDPG with standard experience replay fails to learn in these environements, however with Hindsight Experience Replay (HER) the tasks can be solved.
 
