@@ -24,7 +24,7 @@ The DDPG algorithm with standard experience replay fails to learn in these envir
 
 ### Results
 
-Below you can see the success-rate over 200 epochs (1 epoch = 50 cycles = 16 episodes) for all the different Fetch environments (and random seed = 0). FetchReach-v1 is sovled in less than one epoch and can also be solved without HER.
+Below you can see the success-rate over 200 epochs (1 epoch = 50 cycles = 16 episodes) for all the different Fetch environments (and random seed = 0). FetchReach-v1 is sovled in less than one epoch and can be solved with vanilla DDPG (without HER). Training 200 epochs with 16 parallel workers takes approximately 3 hours.
 
 FetchReach-v1| FetchPush-v1
 -----------------------|-----------------------|
