@@ -24,7 +24,7 @@ The DDPG algorithm with standard experience replay fails to learn in these envir
 
 ### Results
 
-Below you can see the success-rate over 200 epochs (1 epoch = 50 cycles = 16 episodes) for all the different Fetch environments (and random seed = 0).
+Below you can see the success-rate over 200 epochs (1 epoch = 50 cycles = 16 episodes) for all the different Fetch environments (and random seed = 0). FetchReach-v1 is sovled in less than one epoch and can also be solved without HER.
 
 FetchReach-v1| FetchPush-v1
 -----------------------|-----------------------|
@@ -54,7 +54,7 @@ FetchPickAndPlace-v1| FetchSlide-v1
     ├── ddpg.py                            # DDPG agent implmented
     ├── her_sampler.py                     # generating HER samples from episodes in replay-buffer
     ├── main.py                            # main code where training setup is defined
-    ├── model.py                           # Pytorch model (3 layers, 256 nodes each)
+    ├── model.py                           # Pytorch model (3 hidden layers, 256 nodes each)
     ├── parallelEnvironment.py             # vectorize environement for paralllel computing (from openai baselines subprocvec)
     ├── replay_buffer.py                   # buffer to store experiences (as episodes)
     ├── rollout.py                         # worker to generate episodes of experiences
