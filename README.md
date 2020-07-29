@@ -28,11 +28,11 @@ Below you can see the success-rate over 200 epochs (1 epoch = 50 cycles = 16 epi
 
 FetchReach-v1| FetchPush-v1
 -----------------------|-----------------------|
-![](./trained/Reach/seed0/scores_FetchReach-v1_0.png)| ![](./trained/Push/seed0/scores_FetchPush-v1_0.png)
+![](./trained/Reach/Reach.svg)| ![](./trained/Push/Push.svg)
 
 FetchPickAndPlace-v1| FetchSlide-v1
 -----------------------|-----------------------|
-![](./trained/PickAndPlace/seed0/scores_FetchPickAndPlace-v1_0.png)| ![](./trained/Slide/seed0/scores_FetchSlide-v1_0.png)
+![](./trained/PickAndPlace/PickAndPlace.svg)| ![](./trained/Slide/Slide.svg)
 
 
 ### Watch trained agents:
