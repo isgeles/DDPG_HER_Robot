@@ -4,6 +4,7 @@ Used Algorithms:
 - Deep Deterministic Policy Gradient (DDPG)
 - DDPG with Hindsight Experience Replay (DDPG+HER)
 
+My Bachelor's Thesis about RL and Hindsight Experience Replay can be viewed [here](https://drive.google.com/file/d/1ayOb9t2dB-XccyOEDicSLH-0CBFeeaDr/view).
 
 ### Environments
 
